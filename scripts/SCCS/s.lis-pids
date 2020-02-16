@@ -1,0 +1,33 @@
+h30643
+s 00021/00000/00000
+d D 1.1 04/06/06 16:06:52 dave 1 0
+c date and time created 04/06/06 16:06:52 by dave
+e
+u
+U
+f e 0
+t
+T
+I 1
+#!/bin/sh
+
+# argn() usage: argn <n> <args>...
+#
+argn()
+{
+    n=$1;  shift;  echo -n $(eval "echo -n \"\$$n\"")
+}
+
+lis_pids()
+{
+    ps ax 2>/dev/null |
+    grep "LiS-" | grep -v grep |
+    while read line; do
+	echo -n "$(argn 1 $line) "
+    done
+}
+
+{ pids=$(lis_pids); test -n "${pids}"; } && echo "${pids}"
+
+exit $?
+E 1

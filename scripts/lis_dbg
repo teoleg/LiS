@@ -1,0 +1,62 @@
+#!/bin/ksh
+# $Log: lis_dbg,v $
+# Revision 9.2  2012/05/07 18:09:15  hecht
+# PR# 11110 Add System Call Trace Diagnostic Capability to LiS
+# Used a full path, /tmp/  and changed the name from tempfile to lis_tempfile.
+#
+# Revision 9.1  2009/12/15 15:51:19  hecht
+# PR# 10969 Improved diagnostics capabilities for LiS (Linux STREAMS)
+# Script to support access to the LiS Proc File System support which includes a menu with various options.
+#
+#
+#
+
+#set -x
+format='"%a %b %d %H:%M:%S"'
+
+if [[ -z "$1" ]]
+then
+	echo ' '
+	echo 'Usage: lis_dbg <option> <parameters>'
+	echo ' '
+	exit
+fi
+
+if echo $1 | grep "," > /dev/null
+then
+    echo $1 > /proc/LiS
+
+    cat /proc/LiS > /tmp/lis_tempfile$$
+
+    while read line
+    do
+        timestamp=""
+        timestamp=`echo $line | sed -n -e "s/^.*!\(.*\)!.*$/\1/p"`
+        if [[ -n $timestamp ]]
+        then
+            time=`gawk "BEGIN {print strftime($format, $timestamp)}"`
+            echo "$line" | sed -e "s/!.*!/$time/"
+        else
+            echo "$line"
+        fi
+    done < /tmp/lis_tempfile$$
+    rm -f /tmp/lis_tempfile$$
+else
+    echo "$1,$2,$3" > /proc/LiS
+
+    cat /proc/LiS > /tmp/lis_tempfile$$
+
+    while read line
+    do
+        timestamp=""
+        timestamp=`echo $line | sed -n -e "s/^.*!\(.*\)!.*$/\1/p"`
+        if [[ -n $timestamp ]]
+        then
+            time=`gawk "BEGIN {print strftime($format, $timestamp)}"`
+            echo "$line" | sed -e "s/!.*!/$time/"
+        else
+            echo "$line"
+        fi
+    done < /tmp/lis_tempfile$$
+    rm -f /tmp/lis_tempfile$$
+fi

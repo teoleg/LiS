@@ -1,0 +1,201 @@
+#!/bin/bash
+# lis
+# chkconfig: 3 97 3
+# description: Load Linux Streams
+
+# For setting all required environment variables:
+. /etc/profile
+. /etc/init.d/functions
+
+PATH=/usr/bin:/bin:/usr/sbin:/sbin:${PATH}
+export PATH
+
+
+echo_info()
+{  
+   echo -n "$*"
+   success "$*"
+   echo
+   logger -t $0 "[$$]: $* ok"
+   return 0
+}
+
+
+echo_error()
+{  
+   echo -n "$*"
+   failure "$*"
+   echo
+   logger -t $0 -p user.error "[$$]: $* failed"
+   return 0
+}
+
+
+info()
+{
+   logger -t $0 "[$$]: $*"
+   return 0
+}
+
+die()
+{
+   echo -n "$*"
+   failure "$*"
+   echo
+   logger -t $0 -p user.error "[$$]: $* failed"
+   exit 1
+}
+
+function module_in_use {
+  module=$1
+
+  in_use=`lsmod | grep "^\$module " | awk '{print $3}'`
+  [[ -n $in_use && $in_use -ne 0 ]] && return 0 || return 1
+}
+
+function module_is_loaded {
+  module=$1
+
+  loaded=`lsmod | grep "^\$module " | awk '{print $1}'`
+  [[ -n $loaded && "$loaded" == "$module" ]] && return 0 || return 1
+}
+
+function module_is_reffered {
+  module=$1
+
+  ref=`lsmod|grep "^\$module "|awk '{ for(i=1;i<=NF;i++) if (i>3) print $i}'|xargs`
+  ref_modules=`echo $ref|sed -e "s/(.*)//"|sed -e "s/\[//"|sed -e "s/\,/ /"|sed -e "s/\]//"`
+
+  if [[ -n "$ref_modules" ]]
+  then
+     info "$module is referred by the [$ref_modules]"
+     /sbin/modprobe -r $ref_modules > /dev/null 2>&1
+     if [[ $? -ne 0 ]]; then
+	info "cannot unload [$ref_modules]"
+	info "cannot unload [$module]"
+	return 1
+     fi
+  fi
+
+  return 0
+}
+
+
+function superuser {
+  root_id=$(id -u root)
+  user_id=$(id -u)
+
+  if [[ $root_id -ne $user_id ]]; then
+        return 1
+  fi
+  return 0
+}
+
+RHEL_VER="$(cat /etc/redhat-release | cut -d ' ' -f 7 | cut -d '.' -f1)"
+
+info "'$0 $1' started"
+
+RETVAL=0
+
+if [ $RHEL_VER -eq 5 ] || [ $RHEL_VER -gt 5 ] # assume future versions will work the same
+then
+    #Set up for the link to LiS drivers
+    kernel=`uname -r`
+    lis_driver_dir=/lib/modules/$kernel/omnimisc
+fi
+
+case "$1" in
+'start')
+
+   if ! superuser
+   then 
+   	die "Permission denied: must be superuser"
+   fi
+
+   #Allow kernel upgrades for AS5 without re-install of LiS
+   if [ $RHEL_VER -eq 5 ] || [ $RHEL_VER -gt 5 ] # assume future versions will work the same
+   then
+       #Ensure the link to the LiS drivers
+       if [ ! -L $lis_driver_dir ]
+       then
+           #link /lib/modules/omnimisc to /lib/modules/'uname -r'/omnimisc
+	   ln -s /lib/modules/omnimisc $lis_driver_dir
+           #Set dependencies for new path
+	   depmod -ea
+       fi
+   fi
+
+   /usr/sbin/strmakenodes > /dev/null 2>&1
+   /usr/sbin/streams start > /dev/null 2>&1
+   if module_is_loaded streams
+   then
+	echo_info "Load streams"
+   	RETVAL=0
+   else
+	echo_error "Load streams"
+	RETVAL=1
+   fi
+
+   ;;
+
+'stop')
+
+   if ! superuser
+   then 
+   	die "Permission denied: must be superuser"
+   fi
+
+   #if module_is_reffered streams
+   #then
+   #	die "unload streams [in use]"
+   #fi
+
+   #if module_in_use streams
+   #then
+   #	die "unload streams [in use]"
+   #fi
+   /usr/sbin/streams stop > /dev/null 2>&1
+
+   if module_is_loaded streams
+   then
+	echo_error "Unload streams"
+	RETVAL=1
+   else
+	echo_info "Unload streams"
+	RETVAL=0
+   fi
+
+   ;;
+
+'status')
+
+   if module_is_loaded streams
+   then
+      info "Streams loaded"
+      echo "Streams loaded"
+      RETVAL=2
+      if module_in_use streams
+      then
+	info "Streams in use"
+ 	echo "Streams in use"
+	RETVAL=3
+      else
+	info "Streams not in use"
+	echo "Streams not in use"
+      fi
+   else
+      info "Streams not loaded"
+      echo "Streams not loaded"
+      RETVAL=0
+   fi
+   
+   ;;
+*)
+   die "Usage $0: { start | stop | status }"
+   ;;
+esac
+
+exit $RETVAL
+
+
+

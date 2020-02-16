@@ -1,0 +1,161 @@
+Makefile26_ident="@(#) LiS modules/Makefile26 1.5 09/10/04"
+#
+# This is the makefile to make 2.6 style modules.  It uses a kernel
+# makefile Makefile.modpost which we have borrowed from a 2.6.8.1
+# kernel source.  Previous versions of this file were seriously flawed.
+#
+# Also in this directory is a file named ".config" which does NOT contain
+# any configuration information.  It is included by Makefile.modpost
+# and contains some variable setups from the kernel's main Makefile.
+# This things are necessary for Makefile.modpost to execute correctly.
+#
+# By the way, Makefile.modpost is literally copied from the kernel source.
+# There has been no editing done on it, so it would be really easy to
+# upgrade it if necessary.
+#
+# When this makefile is invoked the main Makefile has copied all the ".o"
+# files into the "./marshall" subdirectory.  These are the files that
+# will be turned into ".ko" files by the kernel's Makefile.modpost.
+#
+# Makefile.modpost has a comment at the beginning of it that explains
+# the process of preparing modules in 2.6.
+#
+
+#
+# Some variables of use to us and Makefile.modpost
+# The marshall subdirectory is necessary because modpost needs to
+# have list of file names with '/' in them (or it SEGVs).
+#
+srctree := $(KSRC)
+objtree := $(shell pwd)/$(SD)
+MODVERDIR := $(shell pwd)/$(SD)
+export MODVERDIR KSRC srctree objtree
+
+#
+# The location of the modpost command varies a bit depending upon
+# kernel version.  We need to copy it to a local directory to
+# keep Makefile.modpost happy.
+#
+ifneq ($(wildcard $(KSRC)/scripts/modpost),)
+MODPOST=scripts/modpost
+else
+MODPOST=scripts/mod/modpost
+endif
+
+#
+# This makefile entered from the master Makefile.  Targets:
+#
+# <none>	Default, make modules.  
+# clean		Clean up everything.
+#
+
+# 15 May 2006 MarkS@Adax: A new Makefile.modpost (copied from Debian 3.1 
+#     kernel 2.6.15 source) was required to build the LiS kernel loadable
+#     modules (.ko) for the 2.6.15 kernel.  Added copy command below for
+#     Kbuild.include (if present in kernel source) required by Debian 
+#     kernel 2.6.15 Makefile.modpost (and possibly other kernels in the 
+#     2.6.15 family).
+#     Note: The touch Kbuild.include inserted prior to the copy command of 
+#     Kbuild.include below is required so that the new Makefile.modpost has 
+#     something to include for those kernel sources that do not supply a 
+#     Kbuild.include.
+#
+# If we are doing a clean then there is no point in copying a bunch
+# of files just to remove them.
+#
+ifneq ($(findstring clean,$(MAKECMDGOALS)),clean)
+$(shell mkdir -p scripts/mod scripts/basic)
+$(shell cp $(KSRC)/scripts/gcc-version.sh $(MODVERDIR)/scripts)
+$(shell chmod a+x $(MODVERDIR)/scripts/gcc-version.sh)
+$(shell cp $(KSRC)/scripts/basic/fixdep scripts/basic)
+$(shell chmod a+x $(MODVERDIR)/scripts/gcc-version.sh)
+# This hash program appeared around 2.6.26 for 'dynamic printfs'
+$(shell [ -e $(KSRC)/scripts/basic/hash ] && cp -p $(KSRC)/scripts/basic/hash scripts/basic && chmod a+x scripts/basic/hash)
+$(shell cp $(KSRC)/scripts/Makefile.lib scripts)
+$(shell touch scripts/Kbuild.include)
+$(shell [ -e $(KSRC)/scripts/Kbuild.include ] && cp -p $(KSRC)/scripts/Kbuild.include scripts)
+$(shell cp $(KSRC)/$(MODPOST) scripts/mod)
+main_targets = clean_dot_mods dot_mods
+endif
+
+#
+# The make V=1 convention.  Set up makefile options for nested calls
+# to make.
+#
+ifeq ($(V),1)
+make_opts = -d -p
+make_opts = -d
+make_opts = -p
+make_opts = 
+Q=
+else
+Q=@
+endif
+
+default_goal:	$(main_targets) 
+
+
+#
+# Clean up all the files ending in ".mod" and ".mod.o".
+# The dot_mods target will make them again.
+#
+clean_dot_mods:
+	@echo "Cleaning up previous .mod files"
+	$(Q)-(cd $(MODVERDIR);rm -f *.mod.o *.mod *.c *.ko)
+
+
+#
+# Default rule to make a ".mod" file for each ".o" file in the
+# marshall directory.
+#
+%.mod: %.o
+	$(Q)echo "$(<:.o=.ko)" >$(<:.o=.mod)
+	$(Q)echo "$<" >>$(<:.o=.mod)
+
+#
+# undefine default rule to make a ".o" out of a ".mod"
+#
+%.o: %.mod
+
+#
+# We develop a dependency list that enumerates all ".o"s as ".mod"
+# so that we can get the default rule above to build a series of ".mod"
+# files for us.  Then we can invoke the kernel's makefile to turn
+# this all into a series of ".ko" files.
+#
+DOT_MODS := $(subst .o,.mod,$(wildcard $(MODVERDIR)/*.o))
+DOT_MODS := $(filter-out %.mod.mod,$(DOT_MODS))
+dot_mods: $(DOT_MODS) make_modules
+
+
+clean:
+	$(Q)-rm -rf .tmp_versions $(MODVERDIR) scripts
+
+include .config_mk
+# 17 Nov 2010 MarkS@Adax - AUTOCONF_H_LOC is set here and 
+# passed on via the below make command line for use in the 
+# .config file to set -imacros compilation option.
+# AUTOCONF_FILE variable is set in the config.in file written
+# by the Configure script.  This change was needed to support 
+# newer kernel versions (such as 2.6.34) where the location of 
+# autoconf.h has changed.
+ifeq ($(INCLUDE_AUTOCONF_H),y)
+AUTOCONF_H = y
+AUTOCONF_H_LOC = $(AUTOCONF_FILE)
+endif
+
+# 23 Aug 2007 MarkS@Adax - Added CC= and LD= to the make command line
+# when calling Makefile.modpost in support of proper cross compilation
+# and linking.
+#
+# Invoke the kernel's procedure on the marshall directory.  This
+# takes all the ".mod" and ".o" files and makes ".ko" files.  The
+# ".ko" files get copied to /lib/modules by the master Makefile.
+#
+make_modules:	
+	$(Q)make -r $(make_opts) CC=$(CC) LD=$(LD) -f Makefile.modpost \
+		V=$(V) KBUILD_EXTMOD= SUBDIRS=$(MODVERDIR) \
+		KSRC=$(KSRC) AUTOCONF_H=$(AUTOCONF_H) \
+		AUTOCONF_H_LOC=$(AUTOCONF_H_LOC)
+
+

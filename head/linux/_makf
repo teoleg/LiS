@@ -1,0 +1,125 @@
+include .config_mk
+
+#
+# Environment of LINUX means the intent is to link the code into the
+# Linux kernel.
+#
+OPT = -DLINUX
+
+#
+# Does the user want to run the queues using bottom half or kernel
+# thread.  Set an option to be used when compiling linux-mdep.c
+#
+ifeq ($(STRMS_QUEUES),b)
+OPT += -DUSE_BH
+else
+OPT += -DUSE_KTHREAD
+endif
+
+# Are we compiling to a Linux kernel with module versions?
+ifdef CONFIG_MODULES
+  ifdef CONFIG_MODVERSIONS
+    OPT += -DMODVERSIONS
+  endif 
+endif 
+
+# If get[p]msg and put[p]msg are redefined to use ioctl
+# rather than read/write we have to use the unlocked version
+# of the ioctl interface so getmsg/putmsg can run at the same time.
+ifeq ($(GETMSG_PUTMSG_AS_IOCTL),y)
+    OPT += -DHAVE_UNLOCKED_IOCTL
+endif 
+
+ifeq ($(LIS_HAVE_COMPAT_IOCTL),y)
+    OPT += -DHAVE_COMPAT_IOCTL
+endif 
+
+# Are we compiling LiS as a loadable kernel module?
+ifeq ($(CONFIG_STREAMS),m)
+	OPT += -DMODULE
+	ifeq ($(KBUILD_NEEDS_MODNAME),y)
+		OPT += -DKBUILD_MODNAME=streams
+	endif
+	ifeq ($(KBUILD_NEEDS_MODNAME_REDEF),y)
+		SNAME="streams"
+		OPT += -D"KBUILD_STR(s)=\#s" \
+		       -D"KBUILD_BASENAME=KBUILD_STR(${SNAME})"  \
+		       -D"KBUILD_MODNAME=KBUILD_STR(${SNAME})"
+	endif
+endif 
+
+#ifeq ($(DBG_OPT),y)
+#  OPT += -DDEBUG
+#endif
+
+XOBJS = poll.o
+
+#
+# For any kernel later than 2.0.x we can include our own PCI interface
+# code.
+#
+ifeq ($(KVER_MAJOR),2)
+ifeq ($(KVER_MINOR),0)
+else
+  ifneq ($(ARCH),s390)
+  ifneq ($(ARCH),s390x)
+  XOBJS += lispci.o
+  endif
+  endif
+endif
+endif
+
+ifdef KXEN
+XEN_OPTS += -nostdinc 
+XEN_OPTS += -isystem $(shell $(CC) -print-file-name=include)
+XEN_OPTS += -D__XEN_INTERFACE_VERSION__=$(KXEN) -I$(KSRC)/include/asm/mach-xen 
+ifeq ($(ARCH),x86_64)
+# include/asm/mach-xen got moved in 2.6.28 commit bb898558
+XEN_OPTS += -I$(KSRC)/arch/x86/include/mach-xen
+endif
+XOPTS := $(XEN_OPTS) $(XOPTS)
+endif
+
+# For 64 bit x86 architectures we need to specify the "memory model" (ugh..)
+# dg@adax.com Feb 11, 2005.
+ifeq ($(ARCH),x86_64)
+XOPTS += -mno-red-zone -mcmodel=kernel 
+endif
+
+ifeq ($(ARCH),mips)
+XOPTS += -nostdinc 
+XOPTS += -isystem $(shell $(CC) -print-file-name=include)
+XOPTS += -fno-strict-aliasing -fno-common -ffreestanding 
+XOPTS += -mno-abicalls -fno-pic -msoft-float -march=octeon -Wa,--trap 
+XOPTS += -mabi=64 -mlong-calls -G 0
+#XOPTS += -fno-pic -mno-abicalls -fno-common -mlong-calls -msoft-float -G 0
+endif
+
+ifeq ($(ARCH),ppc)
+XOPTS += -I$(KSRC)/arch/ppc
+endif
+
+#
+# include LiS's memory allocator interface.
+#
+XOBJS += lismem.o
+
+#
+# include LiS's locking code
+#
+XOBJS += lislocks.o
+
+#
+# include the LiS exported symbol list
+#
+XOBJS += exports.o
+
+OPT += -I/usr/src/linux/asm/mach-default
+
+include $(HEADDIR)/mk.bdy
+
+modules: streamshead.o
+
+dep: common-dep
+	$(Q_ECHO) $(qtag_DEP)$(relpwd)
+	$(Q)$(CC) -M -DDEP $(HEADDIR)/poll.c >>.depend

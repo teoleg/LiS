@@ -1,0 +1,16 @@
+h10735
+s 00004/00000/00000
+d D 1.1 04/06/06 16:06:53 dave 1 0
+c date and time created 04/06/06 16:06:53 by dave
+e
+u
+U
+f e 0
+t
+T
+I 1
+#!/bin/sh
+
+modprobe streams
+exit $?
+E 1

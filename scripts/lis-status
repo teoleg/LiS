@@ -1,0 +1,64 @@
+#!/bin/sh
+
+# argn() usage: argn <n> <args>...
+#
+argn()
+{
+    n=$1;  shift;  echo -n $(eval "echo -n \$$n")
+}
+
+print_stat()
+{
+    # check if default psopts were used, if not adjust argn order
+    # to match alternate ps output
+    if [ "$psopts" = "axc" ]
+    then
+        psinfo="`argn 1 $*` `argn 5 $*`"
+    else
+        psinfo="`argn 1 $*` `argn 4 $*`"
+    fi
+    if [ "$psinfo" = " " ]; then
+	psinfo="(LiS not running)"
+	retval=1		# loaded but no queue runner running
+    else
+	retval=0		# loaded and running
+    fi
+    echo "LiS loaded: $psinfo"
+    return $retval
+}
+
+# default options for grep and ps on most systems
+grepopts="-q -w"
+psopts="axc"
+
+# 5 Jul 2009 MarkS@Adax - 
+# check to see if the default options to grep and ps
+# function and if not set alternate options for 
+# systems such as those that use busybox
+echo "xyz" | grep $grepopts xyz > /dev/null 2>&1
+if [ $? -ne 0 ]
+then
+    grepopts="-q"
+fi
+ps $psopts > /dev/null 2>&1
+if [ $? -ne 0 ]
+then
+    psopts=""
+fi
+
+lsmod 2>/dev/null | grep $grepopts "streams"
+if [ $? -eq 0 ]; then
+    streams -s >/dev/null 2>&1
+    # 19 Dec 2005 MarkS@Adax - added c option to ps command to support 
+    # MontaVista linux which displays "modprobe streams" in the process list
+    # if "ps ax" is used.  Without c option "streams status", "strms_status",
+    # and lis-status commands all incorrectly return "(LiS not runing)" on 
+    # MontaVista linux.  Note: the "streams status" command calls 
+    # /usr/sbin/strms_status which in turn is a symlink to lis-status.
+    lisps=`ps $psopts 2>/dev/null`
+    print_stat `echo "$lisps" | grep "LiS-"` | grep -v grep
+    exit $?
+fi
+
+echo "LiS not loaded"
+exit 2				# not loaded

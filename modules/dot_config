@@ -1,0 +1,155 @@
+dot_config_ident="@(#) LiS modules/.config 1.2 09/10/04"
+
+ifdef V
+  ifeq ("$(origin V)", "command line")
+    KBUILD_VERBOSE = $(V)
+  endif
+endif
+ifndef KBUILD_VERBOSE
+  KBUILD_VERBOSE = 0
+endif
+
+ifeq ($(KBUILD_VERBOSE),1)
+  quiet =
+  Q =
+  CFLAGS += -save-temps -fverbose-asm
+else
+  quiet=quiet_
+  Q = @
+endif
+ifneq ($(findstring s,$(MAKEFLAGS)),)
+  quiet=silent_
+endif
+
+export quiet Q KBUILD_VERBOSE
+
+cmd = @$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))' &&) $(cmd_$(1))
+if_changed = $(call cmd,$(1))
+if_changed_dep = $(call cmd,$(1))
+export cmd if_changed if_changed_dep
+
+CONFIG_SHELL = /bin/sh
+# 23 Aug 2007 MarkS@Adax - the prior ARCH determination below did 
+# not support cross compilation when building for a target architecture
+# that does not match the local host architecture (i.e. building for a 
+# 64bit target using a 32bit host).  Enhanced ARCH determination below 
+# by using the ARCH defined in the cross-compile file if it exists.
+# If the cross-compile file does not exist then use the prior ARCH 
+# method of determining the architecture.  Note: the value of ARCH 
+# must match one of the subdirectories within the kernel source arch 
+# subdirectory (see use of $(ARCH) below).
+#
+#ARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
+#                                  -e s/arm.*/arm/ -e s/sa110/arm/ \
+#                                  -e s/s390x/s390/ -e s/parisc64/parisc/ )
+ARCH := $(shell if [ -f ../cross-compile ]; then \
+			grep ARCH ../cross-compile | \
+			sed -e 's/.*=//' -e 's/ //'; \
+		else \
+			uname -m | \
+			sed -e s/i.86/i386/ \
+			    -e s/sun4u/sparc64/ \
+			    -e s/arm.*/arm/ \
+			    -e s/sa110/arm/ \
+			    -e s/mips.*/mips/ \
+			    -e s/ppc64.*/ppc64/ \
+			    -e s/ppc.*/ppc/ \
+			    -e s/s390x/s390/ \
+			    -e s/parisc64/parisc/; \
+		fi)
+
+MKFILE := $(shell set -x; if [ "$(ARCH)" = "i386" -o "$(ARCH)" = "x86_64" ]; \
+			  then \
+				if [ -f $(KSRC)/arch/$(ARCH)/Makefile ]; \
+				then \
+					echo old; \
+				else \
+					echo new; \
+				fi \
+			  else \
+				echo old; \
+			  fi)
+
+$(warning MKFILE=$(MKFILE))
+ 
+# $(warning) is like printf for makefiles..
+# $(warning KBUILD_CFLAGS=$(KBUILD_CFLAGS))
+KBUILD_CFLAGS :=
+
+ifeq ($(MKFILE),old)
+	include $(KSRC)/arch/$(ARCH)/Makefile
+else
+	include $(KSRC)/arch/x86/Makefile
+endif
+
+CPPFLAGS := $(subst -Iinclude,-I$(KSRC)/include,$(CPPFLAGS))
+CPPFLAGS += -D__KERNEL__ -I$(KSRC)/include
+CFLAGS   := $(subst -Iinclude,-I$(KSRC)/include,$(CFLAGS))
+CFLAGS   += -O2
+
+# This -imacros line is necessary for 2.6.18 and later kernels.
+# 17 Nov 2010 MarkS@Adax - AUTOCONF_H_LOC is defined and passed
+# in from  Makefile.2.6 which gets its value from the Configure
+# script generated config.in AUTOCONF_FILE setting.  This change 
+# was needed to support newer kernel versions (such as 2.6.34) 
+# where the location of autoconf.h has changed.
+ifeq ($(AUTOCONF_H),y)
+	CFLAGS   += -imacros $(AUTOCONF_H_LOC)
+endif
+
+LDFLAGS_MODULE = -r
+ifeq ($(ARCH),mips)
+	# The mach-XXX directories have to come first so that we don't
+	# pick up the generic versions of certain headers.  There
+	# are two different copies because the directories got moved
+	# around in 2.6.31 or so.
+	CFLAGS := -I $(KSRC)/include/asm-mips/mach-cavium-octeon \
+		  -I $(KSRC)/include/asm-mips/mach-generic \
+		  -I $(KSRC)/include/asm-mips/mach-default \
+		  -I $(KSRC)/arch/mips/include/asm/mach-cavium-octeon \
+		  -I $(KSRC)/arch/mips/include/asm/mach-generic \
+		  -I $(KSRC)/arch/mips/include/asm/mach-default \
+		  -I $(KSRC)/arch/mips/include \
+		  -fno-builtin $(CFLAGS)
+	LDFLAGS_MODULE = -r -m elf64btsmip
+endif
+
+# 17 Nov 2010 MarkS@Adax - kernel versions 2.6.32 (at least for RHEL6) 
+# and 2.6.34 (OpenSuSE 11.3) have moved asm related include files 
+# within the arch directory structure for which we need to add a 
+# -I path so that those include files can be found.  It appears that
+# what use to be in arch/i386 and arch/x86_64 has been unified into
+# arch/x86.  Below we add a new -I path to arch/x86/include if ARCH
+# is i386 or x86_64.  This should not cause problems for builds with
+# older kernels as -I values to non-existent directories appear to be
+# ignored safely by gcc.
+$(warning ARCH is $(ARCH))
+ifeq ($(ARCH),i386)
+	CFLAGS += -I $(KSRC)/arch/x86/include 
+endif
+ifeq ($(ARCH),x86_64)
+	CFLAGS += -I $(KSRC)/arch/x86/include 
+endif
+
+# 23 Mar 2011 Adax - Added arch/ppc/include path to 
+# CFLAGS below to support building with WindRiver 
+# 2.0 SDK for Radisys ATCA-1200 PowerPC 32-bit kernel 
+# 2.6.21.7-78_WR2.0_rsysppm2.  This was required in 
+# order to find kernel header files such as asm/bitopts.h.
+ifeq ($(ARCH),ppc)
+	CFLAGS := -I $(KSRC)/arch/ppc/include \
+		  -I $(KSRC)/arch/ppc \
+		  -fno-builtin $(CFLAGS)
+endif
+
+c_flags += $(CPPFLAGS) $(CFLAGS) -I$(KSRC)/include
+
+# In later kernels they use KBUILD_CFLAGS instead of CFLAGS...
+KBUILD_CFLAGS += $(CPPFLAGS) $(CFLAGS) -I$(KSRC)/include
+
+ifeq ($(ARCH),i386)
+	KBUILD_CFLAGS += -I$(KSRC)/include/asm-x86/mach-generic -I$(KSRC)/include/asm-x86/mach-default
+endif
+ifeq ($(ARCH),x86_64)
+	KBUILD_CFLAGS += -I$(KSRC)/include/asm-x86/mach-generic -I$(KSRC)/include/asm-x86/mach-default
+endif

@@ -1,0 +1,96 @@
+
+# THIS FILE WAS GENERATED.  MANUAL CHANGES MAY BE LOST.
+
+CONFIG_OPTS=""
+CONFIG=/root/LiS/2.18.1/source/config.in
+SRCDIR=/root/LiS/2.18.1/source
+GENCONF=/root/LiS/2.18.1/source/include/sys/LiS/genconf.h
+CONFIG_STREAMS=m
+TARGET=l
+CROSS_COMPILING=n
+KSRC=//usr/src/kernels/3.10.0-957.21.2.el7.x86_64
+KINCL=//usr/src/kernels/3.10.0-957.21.2.el7.x86_64/include
+NOKSRC=0
+# USE_RUNNING_KERNEL is not set
+NKVER=3.10.0
+KVER=3.10.0-957.21.2.el7.x86_64
+KVER_MAJOR=3.10.0
+KVER_MINOR=10.0
+KVER_PATCH=957
+KVER_PATCHNO=2
+KVER_MAJORMINOR=3.10.0-957.21.2.el7.x86_64
+KVER_H=3.10.0-957.21.2.el7.x86_64
+NKVER_H=3.10.0
+KSMP=y
+# KXEN is not set
+KMODULES=y
+KMODVERS=y
+# LISMODVERS is not set
+AUTOCONF_FILE=//usr/src/kernels/3.10.0-957.21.2.el7.x86_64/include/generated/autoconf.h
+# LISAUTOCONF is not set
+IPV6=y
+# IPV6_MODULE is not set
+CONFIG_MK_KERNEL=n
+STRMS_QUEUES=t
+MOD_INST_DIR=/lib/modules/3.10.0-957.21.2.el7.x86_64/lis
+MOD_INSTALL=n
+# RH_71_KLUDGE is not set
+SIGMASKLOCK=n
+GETMSG_PUTMSG_AS_IOCTL=n
+LIS_HAVE_COMPAT_IOCTL=n
+INCLUDE_AUTOCONF_H=n
+KINCL_ARCH_INC=-I//usr/src/kernels/3.10.0-957.21.2.el7.x86_64/arch/x86/include
+STRUCT_INODE_IPRIVATE=y
+RCVOID=y
+MACHINE=x86_64
+CC_NAME=gcc
+# CC_NAME32 is not set
+CC_VERS=4.8.5
+CC_OPTIMIZE=-O2
+CC_OPT2=
+CC_OPT3=-funit-at-a-time
+CC_OPT4=-Wno-pointer-sign
+# KINCL_MACH_GENERIC is not set
+# KINCL_MACH_CAVIUM_OCTEON is not set
+# KINCL_MACH_DEFAULT is not set
+GET_EMPTY_INODE="get_empty_inode()"
+SET_CPUS_ALLOWED=y
+INT_PSW=n
+# CONFIG_DEV is not set
+# USE_KMEM_CACHE is not set
+# USE_KMEM_TIMER is not set
+LIS_MAJOR_BASE=220
+# CONFIG_INET is not set
+# PKGCOMPILE is not set
+# PKGMODULES is not set
+SILENT_BUILD=y
+KBUILD=n
+# KBUILD_NEEDS_MODNAME is not set
+# KBUILD_NEEDS_SYMVERS is not set
+# KBUILD_NEEDS_MODNAME_REDEF is not set
+MODUTILS=y
+# MODULE_INIT_TOOLS is not set
+# KSYMVERS is not set
+CCREGPARM=-Dccregparm=0
+STREAMS_REGPARM=0
+LIS_OLD_CONSTS=y
+SOLARIS_STYLE_CMN_ERR=n
+DBG_OPT=n
+LIS_SHLIB=y
+package=LiS
+# prefix is not set
+execprefix=/usr
+includedir=/usr/include
+libdir=/usr/lib
+lib64dir=/usr/lib
+bindir=/usr/bin
+sbindir=/usr/sbin
+sysconfdir=/etc
+datadir=/usr/share
+pkgincludedir=/usr/include/LiS
+pkglibdir=/usr/lib/LiS
+pkgdatadir=/usr/share/LiS
+pkgsrcdir=/usr/src/LiS
+mandir=/usr/share/man
+modsubdir=misc
+MAKE_DIRS="scripts rpm head/user head/linux modules libc/user libc/linux man util/user util/linux util/sco util/qnx drivers/str/user drivers/str/linux . pkg/proto pkg include libc32over64/linux"

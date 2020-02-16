@@ -1,0 +1,4 @@
+include /root/LiS/2.18.1/source/config.in
+include /root/LiS/2.18.1/source/config.mk
+include /root/LiS/2.18.1/source/quiet.mk
+include /root/LiS/2.18.1/source/version

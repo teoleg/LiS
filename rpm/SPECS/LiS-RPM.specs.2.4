@@ -1,0 +1,353 @@
+# Root path for the kernel and LiS source
+%define ksrc usr/src
+
+Summary:        LiS (Linux Streams)
+Name:           LiS
+Version:        %{version}
+Release:        %{release}
+Copyright:      LGPL
+Group:          System Environment/Drivers
+Source:         %{name}-%{version}.%{release}.tgz
+BuildRoot:      %{_tmppath}/%{name}-%{version}.%{release}
+Packager:       Martin Hecht <martin.hecht@comverse.com>
+Vendor:		Dave Grothe dave@gcom.com	
+
+AutoReqProv:	no
+
+%description
+This RPM will install Linux Streams drivers, libraries and utilities
+on a target system matching the original host's kernel environment.
+It assumes that LiS is configured to use shared libraries and kernel
+space modules.
+
+%prep
+%setup -q
+
+%install
+rm -rf $RPM_BUILD_ROOT
+mkdir -p $RPM_BUILD_ROOT/{usr/{bin,sbin,lib,man},lib/modules/misc}
+mkdir -p $RPM_BUILD_ROOT/{%{ksrc}/%{name},%{ksrc}/%{name}/include,%{ksrc}/%{name}/modules,%{ksrc}/%{name}/include/sys}
+
+cp libc/libLiS.so   				$RPM_BUILD_ROOT/usr/lib
+cp libc/libpLiS.so   				$RPM_BUILD_ROOT/usr/lib
+cp libc/libLiS.a   				$RPM_BUILD_ROOT/usr/lib
+cp libc/libpLiS.a   				$RPM_BUILD_ROOT/usr/lib
+cp drivers/str/linux/streams-ip_to_dlpi.o	$RPM_BUILD_ROOT/lib/modules/misc
+cp drivers/str/linux/streams-mtdrv.o		$RPM_BUILD_ROOT/lib/modules/misc
+cp drivers/str/linux/streams-pipemod.o		$RPM_BUILD_ROOT/lib/modules/misc
+cp drivers/str/linux/streams-relay3.o		$RPM_BUILD_ROOT/lib/modules/misc
+cp streams.o 					$RPM_BUILD_ROOT/lib/modules/misc
+cp util/linux/streams				$RPM_BUILD_ROOT/usr/sbin
+cp util/linux/makenodes				$RPM_BUILD_ROOT/usr/sbin
+cp util/linux/fattach				$RPM_BUILD_ROOT/usr/sbin
+cp util/linux/fdetach				$RPM_BUILD_ROOT/usr/sbin
+cp util/linux/polltst				$RPM_BUILD_ROOT/usr/bin
+cp util/linux/timetst				$RPM_BUILD_ROOT/usr/bin
+cp util/linux/strtst				$RPM_BUILD_ROOT/usr/bin
+cp scripts/update_conf.modules 			$RPM_BUILD_ROOT/%{ksrc}/%{name}
+cp modules.conf        				$RPM_BUILD_ROOT/%{ksrc}/%{name}
+cp scripts/lis-up            			$RPM_BUILD_ROOT/%{ksrc}/%{name}
+cp scripts/lis-status				$RPM_BUILD_ROOT/%{ksrc}/%{name}
+cp scripts/lis-down				$RPM_BUILD_ROOT/%{ksrc}/%{name}
+cp scripts/lis					$RPM_BUILD_ROOT/%{ksrc}/%{name}
+cp scripts/lis_dbg				$RPM_BUILD_ROOT/%{ksrc}/%{name}
+cp version                      		$RPM_BUILD_ROOT/%{ksrc}/%{name}
+cp COPYING					$RPM_BUILD_ROOT/%{ksrc}/%{name}
+cp -r include/*    				$RPM_BUILD_ROOT/%{ksrc}/%{name}/include
+cp -r man/man[389]                              $RPM_BUILD_ROOT/usr/man
+
+mv $RPM_BUILD_ROOT/usr/sbin/makenodes $RPM_BUILD_ROOT/usr/sbin/strmakenodes
+
+mv $RPM_BUILD_ROOT/%{ksrc}/%{name}/lis-up     $RPM_BUILD_ROOT/%{ksrc}/%{name}/strms_up
+mv $RPM_BUILD_ROOT/%{ksrc}/%{name}/lis-status $RPM_BUILD_ROOT/%{ksrc}/%{name}/strms_status
+mv $RPM_BUILD_ROOT/%{ksrc}/%{name}/lis-down   $RPM_BUILD_ROOT/%{ksrc}/%{name}/strms_down
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+###################
+### Pre-Install ###
+###################
+
+%pre
+
+#echo "PRE-INSTALL %{name}-%{version}-%{release}"
+#echo $1
+
+#################################
+### Check if doing an Upgrade ###
+#################################
+
+if [ $1 = 2 ]
+then
+	#####################################
+	### Clean up for previous version ###
+	#####################################
+
+	echo "Upgrading LiS Version"
+
+	/usr/sbin/streams stop
+
+	cd /%{ksrc}/%{name} && ./update_conf.modules
+
+	(/sbin/chkconfig --list | grep lis) >/dev/null 2>&1
+	if [ $? = 0 ]
+	then
+        	/sbin/chkconfig --del lis
+	fi
+
+        rm -f /etc/init.d/lis
+
+	cd /usr/sbin
+	rm -f strms_up
+	rm -f strms_down
+	rm -f strms_status
+	rm -f lis_dbg
+
+	rm -f /usr/include/LiS
+
+	cd /%{ksrc}
+
+	### Remove both the symbolic link and the directory ###
+	rm -rf %{name}*
+
+	cp -b /etc/modules.conf /etc/modules.conf.bak
+	cp -b /etc/modules.conf /etc/modules.conf.new
+	mv -f /etc/modules.conf.new /etc/modules.conf.old
+	cat /etc/modules.conf.old | sed -e '/^alias.*char-major-.*streams-inet.*$/d' > /etc/modules.conf.new
+	mv -fb /etc/modules.conf.new /etc/modules.conf
+
+	/sbin/ldconfig
+	/sbin/depmod -ae
+fi
+
+cd /usr/lib
+rm -f libLiS*
+rm -f libpLiS*
+
+echo "Creating %{name} as a symlink to /%{ksrc}/%{name}-%{version}.%{release}"
+mkdir /%{ksrc}/%{name}-%{version}.%{release}
+cd /%{ksrc} && ln -s %{name}-%{version}.%{release} %{name}
+
+####################
+### Post-Install ###
+####################
+
+%post
+
+#echo "POST-INSTALL %{name}-%{version}-%{release}"
+#echo $1
+
+cd /usr/lib
+ln -s libLiS.so libLiS.so.0
+ln -s libpLiS.so libpLiS.so.0
+
+cd /usr/sbin
+ln -s /%{ksrc}/%{name}/strms_up strms_up
+ln -s /%{ksrc}/%{name}/strms_down strms_down
+ln -s /%{ksrc}/%{name}/strms_status strms_status
+ln -s /%{ksrc}/%{name}/lis_dbg lis_dbg
+
+rm -rf /usr/include/LiS
+
+ln -s /%{ksrc}/%{name}/include /usr/include/LiS
+
+cd /%{ksrc}/%{name} && ./update_conf.modules conf.modules
+
+if [ ":%{kernel_number}" = ":`uname -r`" ] ; then
+     depmod -ae
+else
+     depmod -ae -F /boot/System.map
+fi
+
+/sbin/depmod -ae
+cd /
+/sbin/ldconfig
+
+if grep -- "streams-inet.o" /proc/modules > /dev/null; then { \
+	rmmod streams-inet.o; \
+	}
+fi
+	
+/sbin/depmod -ae
+
+cp -b /etc/modules.conf /etc/modules.conf.bak
+cp -b /etc/modules.conf /etc/modules.conf.new
+mv -f /etc/modules.conf.new /etc/modules.conf.old
+cat /etc/modules.conf.old | sed -e '/^alias.*char-major-.*streams-inet.*$/d' > /etc/modules.conf.new
+echo -e "alias char-major-30\tstreams-inet\t\t# driver sys inet" >> /etc/modules.conf.new
+mv -fb /etc/modules.conf.new /etc/modules.conf
+
+/usr/sbin/strmakenodes
+
+cd /etc/init.d
+
+rm -f /etc/init.d/lis
+ln -f -s /%{ksrc}/%{name}/lis lis
+
+(/sbin/chkconfig --list | grep lis) >/dev/null 2>&1
+if [ $? = 0 ]   
+then
+        /sbin/chkconfig --level 3 lis off
+        /sbin/chkconfig --del lis
+fi
+/sbin/chkconfig --add lis
+
+#####################
+### Pre-Uninstall ###
+#####################
+
+%preun
+
+#echo "PRE-UNINSTALL %{name}-%{version}-%{release}"
+#echo $1
+
+#################################
+### Check if doing an Upgrade ###
+#################################
+
+if [ $1 != 0 ]
+then
+	exit 0
+fi
+
+/usr/sbin/streams stop
+cd /%{ksrc}/%{name} && ./update_conf.modules
+
+(/sbin/chkconfig --list | grep lis) >/dev/null 2>&1
+if [ $? = 0 ]
+then
+        /sbin/chkconfig --del lis
+fi
+
+rm -f /etc/init.d/lis
+
+######################
+### Post-Uninstall ###
+######################
+
+%postun 
+
+#echo "POST-UNINSTALL %{name}-%{version}-%{release}"
+#echo $1
+
+#################################
+### Check if doing an Upgrade ###
+#################################
+
+if [ $1 != 0 ]
+then
+	exit 0
+fi
+
+cd /usr/lib
+rm -f libLiS.so.0
+rm -f libpLiS.so.0
+
+cd /usr/sbin
+rm -f strms_up
+rm -f strms_down
+rm -f strms_status
+rm -f lis_dbg
+
+rm -f /usr/include/LiS
+
+cd /%{ksrc}
+echo "Remove %{name} symlink"
+rm -f %{name}
+
+echo "Remove %{name}-%{version}.%{release} directory"
+rm -rf %{name}-%{version}.%{release}
+
+cp -b /etc/modules.conf /etc/modules.conf.bak
+cp -b /etc/modules.conf /etc/modules.conf.new
+mv -f /etc/modules.conf.new /etc/modules.conf.old
+cat /etc/modules.conf.old | sed -e '/^alias.*char-major-.*streams-inet.*$/d' > /etc/modules.conf.new
+mv -fb /etc/modules.conf.new /etc/modules.conf
+
+/sbin/ldconfig
+/sbin/depmod -ae
+
+%files
+%defattr(-,root,root)
+/usr/lib/libLiS.so
+/usr/lib/libpLiS.so
+/usr/lib/libLiS.a
+/usr/lib/libpLiS.a
+/lib/modules/misc/*.o
+/usr/sbin/fattach
+/usr/sbin/fdetach
+/usr/sbin/strmakenodes
+/usr/sbin/streams
+/usr/bin/polltst
+/usr/bin/timetst
+/usr/bin/strtst
+/%{ksrc}/%{name}/update_conf.modules
+/%{ksrc}/%{name}/modules.conf
+/%{ksrc}/%{name}/strms_down
+/%{ksrc}/%{name}/strms_status
+/%{ksrc}/%{name}/strms_up
+/%{ksrc}/%{name}/lis
+/%{ksrc}/%{name}/lis_dbg
+/%{ksrc}/%{name}/version
+/%{ksrc}/%{name}/COPYING
+/%{ksrc}/%{name}/include/*
+/usr/man/man3/fattach.3.gz
+/usr/man/man3/fdetach.3.gz
+/usr/man/man3/isastream.3.gz
+/usr/man/man3/pipe.3.gz
+/usr/man/man8/fattach.8.gz
+/usr/man/man8/fdetach.8.gz
+/usr/man/man9/connld.9.gz
+/usr/man/man9/fifo.9.gz
+/usr/man/man9/pipemod.9.gz
+
+%changelog
+* Mon Apr 01 2013 Martin Hecht <martin.hecht@comverse.com> 2.18.1.0
+- Support RHEL6.2 64-bit.
+* Wed Aug 08 2012 Martin Hecht <martin.hecht@comverse.com> 2.18.1.0
+- Support RHEL6.2 32-bit.
+* Mon May 07 2012 Martin Hecht <martin.hecht@comverse.com> 2.18.1.0
+- Added Proc Filesystem diagnostics support for System Call tracing.
+* Tue Nov 01 2011 Martin Hecht <martin.hecht@comverse.com> 2.18.1.0
+- Removed build and support of certain add-on drivers from LiS.
+* Thu Mar 04 2010 Martin Hecht <martin.hecht@comverse.com> 2.18.1.0
+- Merge with Enhanced Scheduler version.
+* Wed Feb 17 2010 Martin Hecht <martin.hecht@comverse.com> 2.18.1.0
+- Disable KMEM-CACHE usage, mark memory.
+* Tue Oct 27 2009 Martin Hecht <martin.hecht@comverse.com> 2.18.1.0
+- Work on Proc Filsystem support for enhanced LiS diagnostic capabilities.
+* Mon May 18 2009 Martin Hecht <martin.hecht@comverse.com> 2.18.1.0
+- Change the _QUEUE_H define to _LIS_QUEUE_H in various include files.
+* Tue Apr 14 2009 Martin Hecht <martin.hecht@comverse.com> 2.18.1.0
+- Support for Linux Upgrades in the field.
+* Wed Aug 13 2008 Martin Hecht <martin.hecht@comverse.com> 2.18.1.0
+- Make LiS-2.18.1.0 work for both Linux 2.4 and 2.6; created LiS-RPM.specs.2.4
+* Tue May 27 2008 Martin Hecht <martin.hecht@comverse.com> 2.18.0.1
+- LiS release number changed to 2.18.0.1-2. Also fix to pre-install for -U support
+* Wed Mar 21 2007 Martin Hecht <martin.hecht@comverse.com> 2.18.0.1
+- Added support for static libraries.
+* Thu Mar 8 2007 Martin Hecht <martin.hecht@comverse.com> 2.18.0.1
+- Make this version upgradable, i.e. make rpm -U work.
+* Thu Feb 1 2007 Martin Hecht <martin.hecht@comverse.com> 2.18.0.1
+- Create/remove a link for /usr/include/LiS.
+* Thu Jan 25 2007 Martin Hecht <martin.hecht@comverse.com> 2.18.0.1
+- Rework copy and move technique in the install section.
+* Tue Jan 23 2007 Martin Hecht <martin.hecht@comverse.com> 2.18.0.1
+- Explicitly copy the /driver/str/linux drivers.
+* Fri Jan 19 2007 Martin Hecht <martin.hecht@comverse.com> 2.18.0.1
+- Add service lis support to this RPM.  Note that the package name has changed.
+* Mon Jan 8 2007 Martin Hecht <martin.hecht@comverse.com> 2.18.0.S
+- Disable Automatic Dependency Processing
+* Wed Dec 6 2006 Martin Hecht <martin.hecht@comverse.com> 2.18.0.S
+- Removed checks in pre-install. In post-install force depmod to use current symbols.
+* Wed Dec 6 2006 Martin Hecht <martin.hecht@comverse.com> 2.18.0.S
+- Removed references to %kernel for making directories and copying files.
+* Tue Dec 5 2006 Martin Hecht <martin.hecht@comverse.com> 2.18.0.S
+- Added creation of symbolic links in the post-install and removed them in the post-uninstall
+* Sat Oct 11 2003 Oleg Terletsky <oleg.terletsky@comverse.com>
+- Update license info and add LGPL COPYING file
+* Tue May 20 2003 Vassilii Khachaturov <vassilii.khachaturov@comverse.com>
+- absolute paths fixes, minor optimizations, description, mans added in
+* Thu May 16 2003 Oleg Terletsky <oleg.terletsky@comverse.com> 2.16-8
+- Update to version 8

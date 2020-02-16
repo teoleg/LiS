@@ -1,0 +1,23 @@
+#!/bin/sh
+
+# 20 July 2009 MarkS@Adax - To the moon!  40th anniversary.
+# SuSE Enterprise 11 defaults to not allow unsupported modules.
+# Newer modprobe versions provide an option --allow-unsupported-modules.
+
+# try with -n (dry run).
+modprobe -n streams > /dev/null 2>&1
+ret=$?
+if [ $ret -eq 0 ]
+then
+	modprobe -f streams
+	ret=$?
+elif [ $ret -eq 2 ] # newer modprobe returns 2 if module unsupported
+then
+	modprobe --allow-unsupported-modules streams
+	ret=$?
+	if [ $ret -ne 0 ]
+	then
+		exit $ret
+	fi
+fi
+exit $ret

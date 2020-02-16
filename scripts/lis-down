@@ -1,0 +1,43 @@
+#!/bin/sh
+
+# 16 Dec 2005 MarkS@Adax - MontaVista Pro 4.0 filesystem places
+# lsmod in /usr/bin instead of the /sbin like most other linux
+# systems.  Look for lsmod location in expected places and set
+# lsmodcmd var for use below.  If lsmod not found in expected 
+# places rely on it being in the user's PATH.
+if [ -e /sbin/lsmod ]; then
+    lsmodcmd=/sbin/lsmod
+elif [ -e /usr/bin/lsmod ]; then
+    lsmodcmd=/usr/bin/lsmod
+else
+    lsmodcmd=lsmod
+fi
+
+getarg1()
+{
+    echo $1
+}
+
+getstrmmods()
+{
+    $lsmodcmd | grep "^streams[-_]" | \
+    while read line; do
+        echo -n "`getarg1 $line` "
+    done
+}
+
+# 02/25/2014 MTH fattach/fdetach feature is no longer supported
+# if $lsmodcmd | grep -q "^streams"; then
+#    # Detach from all files
+#    /usr/sbin/fdetach -a
+# fi
+
+strmmods=`getstrmmods`
+if [ "$strmmods..." != "..." ]; then
+    if ! modprobe -r $strmmods 2>/dev/null; then
+	echo "Could not unload module(s): ${strmmods}."
+    fi
+fi
+
+modprobe -r streams 2>/dev/null
+exit $?

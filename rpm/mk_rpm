@@ -1,0 +1,85 @@
+#!/bin/bash
+. ../version
+. ../config.in
+. ./targets
+
+release=$RELEASE
+#kernel=$KVER
+
+FILE_SET="RPMS BUILD SOURCES tmp"
+RPMBUILD=`type -p rpmbuild`
+if [ "$RPMBUILD..." = "..." ]; then
+	RPMBUILD='rpm'
+fi
+
+echo "Run rpm build for LiS-$LISVER , kernel $KVER" 
+
+rm -rf $FILE_SET
+mkdir  $FILE_SET
+
+echo "Go to root directory"
+
+cd ..
+PDIR=`pwd | sed -e 's:.*/::g'`
+cd ..
+
+if [ ! -d LiS-$LISVER ]; then
+	echo "Create symlink to project directory"
+	ln -s `pwd`/$PDIR LiS-$LISVER
+fi
+
+echo "Pack all targets"
+
+if [ "$KVER_MAJORMINOR" = "2.6" ]
+then
+set -x
+	if [ "$(uname -m)" = "x86_64" ]; then
+		tar czf LiS-$LISVER.${release}.tgz $RPM_FILES26_x86_64
+	else
+		tar czf LiS-$LISVER.${release}.tgz $RPM_FILES26
+	fi
+set +x
+else
+tar czf LiS-$LISVER.${release}.tgz $RPM_FILES24
+fi
+
+if [ -h LiS-$LISVER ];then
+	echo "Remove temporary link" 
+	rm LiS-$LISVER
+fi
+
+echo "Move tar file to rpm/SOURCES"
+mv LiS-$LISVER.${release}.tgz $PDIR/rpm/SOURCES
+
+cd $PDIR/rpm
+
+echo "Build RPM"
+
+if [ "$KVER_MAJORMINOR" = "2.6" ]
+then
+	if [ "$(uname -m)" = "x86_64" ]; then
+$RPMBUILD --define "_topdir `pwd`" \
+	--define "_tmppath `pwd`/tmp" \
+	--define "version $LISVER" \
+	--define "release $release" \
+	--define "kernel $KVER" \
+	--define "target $TARGET" \
+	-bb SPECS/LiS-RPM.specs.2.6.x86_64
+	else
+$RPMBUILD --define "_topdir `pwd`" \
+	--define "_tmppath `pwd`/tmp" \
+	--define "version $LISVER" \
+	--define "release $release" \
+	--define "kernel $KVER" \
+	--define "target $TARGET" \
+	-bb SPECS/LiS-RPM.specs.2.6
+	fi
+else
+$RPMBUILD --define "_topdir `pwd`" \
+	--define "_tmppath `pwd`/tmp" \
+	--define "version $LISVER" \
+	--define "release $release" \
+	--define "kernel $KVER" \
+	--define "target $TARGET" \
+	-bb SPECS/LiS-RPM.specs.2.4
+fi
